@@ -1,0 +1,488 @@
+<meta charset="utf-8">
+<title>給茶機カウンター</title>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500&family=Zen+Old+Mincho:wght@600&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --ink: #232b29;
+    --ink-soft: #5a6461;
+    --ink-faint: #98a29e;
+    --paper: #f6f6f2;
+    --card: #ffffff;
+    --celadon: #9fbfaf;
+    --celadon-deep: #3f7460;
+    --line: #e2e4de;
+    --ryokucha: #5c8c5a;
+    --uron: #a5763a;
+    --genmai: #bfa15c;
+    --coffee: #6b4a38;
+  }
+
+  body {
+    font-family: "Zen Kaku Gothic New", "Hiragino Sans", "Yu Gothic UI", Meiryo, sans-serif;
+    background: var(--paper);
+    color: var(--ink);
+    -webkit-font-smoothing: antialiased;
+    padding: 26px 20px 56px;
+    display: flex;
+    justify-content: center;
+  }
+
+  .app { width: 100%; max-width: 460px; }
+
+  .head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    padding-bottom: 13px;
+    border-bottom: 1px solid var(--line);
+  }
+  .head h1 { font-size: 15px; font-weight: 500; letter-spacing: 0.04em; }
+  .date { font-size: 13px; color: var(--ink-faint); font-variant-numeric: tabular-nums; }
+
+  .tabs { display: flex; gap: 20px; margin-top: 16px; }
+  .tab {
+    font-family: inherit;
+    font-size: 14px;
+    color: var(--ink-faint);
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    padding: 4px 0 7px;
+    cursor: pointer;
+  }
+  .tab.on { color: var(--ink); border-color: var(--celadon-deep); }
+  .tab:focus-visible { outline: 2px solid var(--celadon-deep); outline-offset: 3px; }
+
+  .pane { display: none; }
+  .pane.on { display: block; }
+
+  .hero { padding: 32px 0 28px; text-align: center; }
+  .beads { display: flex; justify-content: center; gap: 11px; margin-bottom: 20px; }
+  .bead {
+    width: 17px; height: 17px; border-radius: 50%;
+    border: 1.5px solid var(--celadon-deep);
+    background: var(--celadon-deep);
+    transition: background 200ms ease, transform 200ms ease, border-color 200ms ease;
+  }
+  .bead.spent { background: transparent; border-color: var(--line); transform: scale(0.72); }
+
+  .count {
+    font-family: "Zen Old Mincho", serif;
+    font-size: 74px; font-weight: 600; line-height: 0.9;
+  }
+  .count.done { color: var(--ink-faint); }
+  .count-label { font-size: 13px; color: var(--ink-soft); margin-top: 12px; }
+
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .drink {
+    position: relative;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 16px 14px 14px;
+    text-align: left;
+    font-family: inherit; font-size: 16px; font-weight: 500;
+    color: var(--ink); cursor: pointer;
+    transition: border-color 140ms ease, transform 90ms ease;
+  }
+  .drink:hover:not(:disabled) { border-color: var(--celadon); }
+  .drink:active:not(:disabled) { transform: scale(0.985); }
+  .drink:focus-visible { outline: 2px solid var(--celadon-deep); outline-offset: 2px; }
+  .drink:disabled { opacity: 0.4; cursor: default; }
+  .swatch { display: block; width: 22px; height: 3px; border-radius: 2px; margin-bottom: 11px; }
+  .tally {
+    position: absolute; right: 14px; bottom: 13px;
+    font-size: 13px; color: var(--ink-faint); font-variant-numeric: tabular-nums;
+  }
+
+  .note {
+    margin-top: 10px; padding: 12px 14px;
+    border: 1px dashed var(--line); border-radius: 10px;
+    font-size: 13px; color: var(--ink-soft);
+  }
+
+  .block { margin-top: 26px; }
+  .block-head {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 10px;
+  }
+  .block-head span { font-size: 13px; color: var(--ink-soft); }
+
+  .ghost {
+    font-family: inherit; font-size: 13px; color: var(--ink-soft);
+    background: none; border: none;
+    border-bottom: 1px solid var(--line);
+    padding: 2px 0; cursor: pointer;
+  }
+  .ghost:hover { color: var(--ink); border-color: var(--ink-soft); }
+  .ghost:disabled { opacity: 0.35; cursor: default; }
+  .ghost:focus-visible { outline: 2px solid var(--celadon-deep); outline-offset: 3px; }
+
+  .row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 0; border-bottom: 1px solid var(--line); font-size: 14px;
+  }
+  .row .time {
+    margin-left: auto; font-size: 13px;
+    color: var(--ink-faint); font-variant-numeric: tabular-nums;
+  }
+  .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+  .empty { font-size: 14px; color: var(--ink-faint); padding: 12px 0; }
+
+  .cards { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-top: 22px; }
+  .stat { background: var(--card); border-radius: 10px; padding: 14px 12px; }
+  .stat b {
+    display: block; font-family: "Zen Old Mincho", serif;
+    font-size: 27px; font-weight: 600; line-height: 1.1;
+    font-variant-numeric: tabular-nums;
+  }
+  .stat i { font-style: normal; font-size: 12px; color: var(--ink-faint); }
+
+  .bars { display: grid; gap: 8px; }
+  .bar { display: grid; grid-template-columns: 62px 1fr 34px; align-items: center; gap: 10px; font-size: 13px; }
+  .bar .track { height: 9px; background: var(--line); border-radius: 5px; overflow: hidden; }
+  .bar .fill { height: 100%; border-radius: 5px; }
+  .bar .n { text-align: right; color: var(--ink-faint); font-variant-numeric: tabular-nums; }
+
+  .cols { display: flex; align-items: flex-end; gap: 3px; height: 92px; }
+  .col { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; height: 100%; }
+  .col .v { background: var(--celadon); border-radius: 3px 3px 0 0; min-height: 2px; }
+  .col.zero .v { background: var(--line); }
+  .axis {
+    display: flex; justify-content: space-between;
+    margin-top: 7px; font-size: 11px; color: var(--ink-faint);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .foot {
+    margin-top: 26px; padding-top: 14px; border-top: 1px solid var(--line);
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 12px; color: var(--ink-faint); gap: 12px;
+  }
+
+  .warn {
+    margin-top: 14px; padding: 12px 14px;
+    border: 1px solid #d9b8a8; border-radius: 10px;
+    font-size: 13px; color: #8a4a30; display: none;
+  }
+
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="app">
+  <div class="head">
+    <h1>給茶機カウンター</h1>
+    <div class="date" id="date">—</div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab on" id="tabToday">今日</button>
+    <button class="tab" id="tabStats">記録</button>
+  </div>
+
+  <div class="pane on" id="paneToday">
+    <div class="hero">
+      <div class="beads" id="beads"></div>
+      <div class="count" id="count">—</div>
+      <div class="count-label" id="countLabel">読み込み中</div>
+    </div>
+
+    <div class="grid" id="grid"></div>
+    <div class="note">お湯・水は制限なし。カウント不要です。</div>
+
+    <div class="block">
+      <div class="block-head">
+        <span>今日の記録</span>
+        <button class="ghost" id="undo" disabled>1つ取り消す</button>
+      </div>
+      <div id="rows"></div>
+    </div>
+  </div>
+
+  <div class="pane" id="paneStats">
+    <div class="cards" id="cards"></div>
+
+    <div class="block">
+      <div class="block-head"><span>種類の内訳</span></div>
+      <div class="bars" id="byType"></div>
+    </div>
+
+    <div class="block">
+      <div class="block-head"><span>時間帯</span></div>
+      <div class="cols" id="byHour"></div>
+      <div class="axis"><span>7時</span><span>12時</span><span>17時</span><span>21時</span></div>
+    </div>
+
+    <div class="block">
+      <div class="block-head"><span>曜日</span></div>
+      <div class="bars" id="byDow"></div>
+    </div>
+
+    <div class="block">
+      <div class="block-head"><span>直近14日</span></div>
+      <div class="cols" id="byDay"></div>
+      <div class="axis" id="dayAxis"></div>
+    </div>
+
+    <div class="foot">
+      <button class="ghost" id="csv">CSVで書き出す</button>
+      <button class="ghost" id="wipe">全記録を削除</button>
+    </div>
+  </div>
+
+  <div class="warn" id="warn">
+    このブラウザでは記録を保存できません。Chrome か Edge で開いてみてください。
+  </div>
+
+  <div class="foot">
+    <span>日付が変わると自動でリセットされます</span>
+    <button class="ghost" id="reset">今日をリセット</button>
+  </div>
+</div>
+
+<script>
+  const LIMIT = 5;
+  const KEY = "kyuchaki:log";
+  const DOW = ["日", "月", "火", "水", "木", "金", "土"];
+
+  const DRINKS = [
+    { id: "ryokucha", name: "緑茶",     color: "var(--ryokucha)" },
+    { id: "uron",     name: "烏龍茶",   color: "var(--uron)" },
+    { id: "genmai",   name: "玄米茶",   color: "var(--genmai)" },
+    { id: "coffee",   name: "コーヒー", color: "var(--coffee)" }
+  ];
+
+  let log = [];
+
+  function today() {
+    const d = new Date();
+    return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+  }
+  function prettyDate() {
+    const d = new Date();
+    return (d.getMonth() + 1) + "月" + d.getDate() + "日 (" + DOW[d.getDay()] + ")";
+  }
+  function drinkOf(id) {
+    return DRINKS.find(function (x) { return x.id === id; }) || DRINKS[0];
+  }
+  function todays() {
+    const t = today();
+    return log.filter(function (e) { return e.d === t; });
+  }
+
+  function load() {
+    try {
+      const raw = localStorage.getItem(KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) log = parsed;
+      }
+    } catch (e) { log = []; }
+    render();
+  }
+  function save() {
+    try { localStorage.setItem(KEY, JSON.stringify(log)); } catch (e) {}
+  }
+
+  function add(id) {
+    if (todays().length >= LIMIT) return;
+    const now = new Date();
+    log.push({
+      d: today(),
+      id: id,
+      h: now.getHours(),
+      m: now.getMinutes()
+    });
+    save(); render();
+  }
+  function undo() {
+    const t = today();
+    for (let i = log.length - 1; i >= 0; i--) {
+      if (log[i].d === t) { log.splice(i, 1); break; }
+    }
+    save(); render();
+  }
+  function resetToday() {
+    const t = today();
+    log = log.filter(function (e) { return e.d !== t; });
+    save(); render();
+  }
+  function wipe() {
+    if (!confirm("これまでの全記録を削除します。元に戻せません。")) return;
+    log = []; save(); render();
+  }
+
+  function hhmm(e) {
+    return String(e.h).padStart(2, "0") + ":" + String(e.m).padStart(2, "0");
+  }
+
+  function buildGrid() {
+    const grid = document.getElementById("grid");
+    DRINKS.forEach(function (d) {
+      const b = document.createElement("button");
+      b.className = "drink";
+      b.innerHTML =
+        '<span class="swatch" style="background:' + d.color + '"></span>' + d.name +
+        '<span class="tally" data-tally="' + d.id + '"></span>';
+      b.addEventListener("click", function () { add(d.id); });
+      grid.appendChild(b);
+    });
+  }
+
+  function barRow(label, n, max, color) {
+    const w = max ? Math.round((n / max) * 100) : 0;
+    return '<div class="bar"><span>' + label + '</span>' +
+      '<span class="track"><span class="fill" style="width:' + w + '%;background:' + color + '"></span></span>' +
+      '<span class="n">' + n + '</span></div>';
+  }
+
+  function columns(el, values, labelFor) {
+    const max = Math.max.apply(null, values.concat([1]));
+    el.innerHTML = values.map(function (v, i) {
+      const h = Math.round((v / max) * 100);
+      const title = labelFor ? ' title="' + labelFor(i) + ': ' + v + '回"' : '';
+      return '<span class="col' + (v ? '' : ' zero') + '"' + title +
+        '><span class="v" style="height:' + (v ? Math.max(h, 4) : 2) + '%"></span></span>';
+    }).join("");
+  }
+
+  function renderToday() {
+    const t = todays();
+    const used = t.length;
+    const left = LIMIT - used;
+
+    document.getElementById("date").textContent = prettyDate();
+
+    const beads = document.getElementById("beads");
+    beads.innerHTML = "";
+    for (let i = 0; i < LIMIT; i++) {
+      const s = document.createElement("div");
+      s.className = "bead" + (i < used ? " spent" : "");
+      beads.appendChild(s);
+    }
+
+    const count = document.getElementById("count");
+    count.textContent = left;
+    count.classList.toggle("done", left === 0);
+    document.getElementById("countLabel").textContent =
+      left === 0 ? "本日は上限です" : "あと " + left + " プッシュ";
+
+    DRINKS.forEach(function (d) {
+      const n = t.filter(function (e) { return e.id === d.id; }).length;
+      const el = document.querySelector('[data-tally="' + d.id + '"]');
+      if (el) el.textContent = n ? n : "";
+    });
+    document.querySelectorAll(".drink").forEach(function (b) { b.disabled = left === 0; });
+
+    const rows = document.getElementById("rows");
+    if (!used) {
+      rows.innerHTML = '<div class="empty">まだ飲んでいません。</div>';
+    } else {
+      rows.innerHTML = t.map(function (e) {
+        const d = drinkOf(e.id);
+        return '<div class="row"><span class="dot" style="background:' + d.color + '"></span>' +
+          d.name + '<span class="time">' + hhmm(e) + '</span></div>';
+      }).join("");
+    }
+    document.getElementById("undo").disabled = !used;
+  }
+
+  function renderStats() {
+    const days = {};
+    log.forEach(function (e) { days[e.d] = (days[e.d] || 0) + 1; });
+    const dayKeys = Object.keys(days);
+    const total = log.length;
+    const avg = dayKeys.length ? (total / dayKeys.length).toFixed(1) : "0";
+    const maxed = dayKeys.filter(function (k) { return days[k] >= LIMIT; }).length;
+
+    document.getElementById("cards").innerHTML =
+      '<div class="stat"><b>' + total + '</b><i>累計</i></div>' +
+      '<div class="stat"><b>' + avg + '</b><i>1日平均</i></div>' +
+      '<div class="stat"><b>' + maxed + '</b><i>上限到達日</i></div>';
+
+    const typeCounts = DRINKS.map(function (d) {
+      return log.filter(function (e) { return e.id === d.id; }).length;
+    });
+    const tMax = Math.max.apply(null, typeCounts.concat([1]));
+    document.getElementById("byType").innerHTML = DRINKS.map(function (d, i) {
+      return barRow(d.name, typeCounts[i], tMax, d.color);
+    }).join("");
+
+    const hours = [];
+    for (let h = 7; h <= 21; h++) {
+      hours.push(log.filter(function (e) { return e.h === h; }).length);
+    }
+    columns(document.getElementById("byHour"), hours, function (i) { return (i + 7) + "時"; });
+
+    const dow = [0, 0, 0, 0, 0, 0, 0];
+    log.forEach(function (e) {
+      const p = e.d.split("-");
+      dow[new Date(p[0], p[1] - 1, p[2]).getDay()] += 1;
+    });
+    const work = [1, 2, 3, 4, 5];
+    const dMax = Math.max.apply(null, dow.concat([1]));
+    document.getElementById("byDow").innerHTML = work.map(function (i) {
+      return barRow(DOW[i] + "曜", dow[i], dMax, "var(--celadon-deep)");
+    }).join("");
+
+    const recent = [], labels = [];
+    for (let i = 13; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const k = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+      recent.push(days[k] || 0);
+      labels.push((d.getMonth() + 1) + "/" + d.getDate());
+    }
+    columns(document.getElementById("byDay"), recent, function (i) { return labels[i]; });
+    document.getElementById("dayAxis").innerHTML =
+      '<span>' + labels[0] + '</span><span>' + labels[7] + '</span><span>今日</span>';
+  }
+
+  function render() { renderToday(); renderStats(); }
+
+  function exportCsv() {
+    const head = "date,dow,time,drink\n";
+    const body = log.map(function (e) {
+      const p = e.d.split("-");
+      const w = DOW[new Date(p[0], p[1] - 1, p[2]).getDay()];
+      return [e.d, w, hhmm(e), drinkOf(e.id).name].join(",");
+    }).join("\n");
+    const blob = new Blob(["\uFEFF" + head + body], { type: "text/csv;charset=utf-8" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "kyuchaki-" + today() + ".csv";
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  function tab(which) {
+    const t = which === "today";
+    document.getElementById("tabToday").classList.toggle("on", t);
+    document.getElementById("tabStats").classList.toggle("on", !t);
+    document.getElementById("paneToday").classList.toggle("on", t);
+    document.getElementById("paneStats").classList.toggle("on", !t);
+  }
+
+  document.getElementById("tabToday").addEventListener("click", function () { tab("today"); });
+  document.getElementById("tabStats").addEventListener("click", function () { tab("stats"); });
+  document.getElementById("undo").addEventListener("click", undo);
+  document.getElementById("reset").addEventListener("click", resetToday);
+  document.getElementById("wipe").addEventListener("click", wipe);
+  document.getElementById("csv").addEventListener("click", exportCsv);
+
+  function storageWorks() {
+    try { localStorage.setItem("__t", "1"); localStorage.removeItem("__t"); return true; }
+    catch (e) { return false; }
+  }
+
+  buildGrid();
+  if (!storageWorks()) document.getElementById("warn").style.display = "block";
+  load();
+
+  let lastDay = today();
+  setInterval(function () {
+    if (today() !== lastDay) { lastDay = today(); render(); }
+  }, 60000);
+</script>
