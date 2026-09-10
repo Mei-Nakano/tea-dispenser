@@ -1,9 +1,12 @@
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>給茶機カウンター</title>
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500&family=Zen+Old+Mincho:wght@600&display=swap" rel="stylesheet">
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+  button { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
 
   :root {
     --ink: #232b29;
@@ -26,6 +29,7 @@
     color: var(--ink);
     -webkit-font-smoothing: antialiased;
     padding: 26px 20px 56px;
+    padding: 26px max(20px, env(safe-area-inset-right)) calc(56px + env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
     display: flex;
     justify-content: center;
   }
@@ -88,7 +92,7 @@
     color: var(--ink); cursor: pointer;
     transition: border-color 140ms ease, transform 90ms ease;
   }
-  .drink:hover:not(:disabled) { border-color: var(--celadon); }
+  @media (hover: hover) { .drink:hover:not(:disabled) { border-color: var(--celadon); } }
   .drink:active:not(:disabled) { transform: scale(0.985); }
   .drink:focus-visible { outline: 2px solid var(--celadon-deep); outline-offset: 2px; }
   .drink:disabled { opacity: 0.4; cursor: default; }
@@ -115,9 +119,9 @@
     font-family: inherit; font-size: 13px; color: var(--ink-soft);
     background: none; border: none;
     border-bottom: 1px solid var(--line);
-    padding: 2px 0; cursor: pointer;
+    padding: 2px 0; cursor: pointer; white-space: nowrap;
   }
-  .ghost:hover { color: var(--ink); border-color: var(--ink-soft); }
+  @media (hover: hover) { .ghost:hover { color: var(--ink); border-color: var(--ink-soft); } }
   .ghost:disabled { opacity: 0.35; cursor: default; }
   .ghost:focus-visible { outline: 2px solid var(--celadon-deep); outline-offset: 3px; }
 
@@ -159,14 +163,24 @@
 
   .foot {
     margin-top: 26px; padding-top: 14px; border-top: 1px solid var(--line);
-    display: flex; justify-content: space-between; align-items: center;
-    font-size: 12px; color: var(--ink-faint); gap: 12px;
+    display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center;
+    font-size: 12px; color: var(--ink-faint); gap: 8px 12px;
   }
+  .foot .ghost:last-child { margin-left: auto; }
 
   .warn {
     margin-top: 14px; padding: 12px 14px;
     border: 1px solid #d9b8a8; border-radius: 10px;
     font-size: 13px; color: #8a4a30; display: none;
+  }
+
+  @media (max-width: 360px) {
+    body {
+      padding-left: max(16px, env(safe-area-inset-left));
+      padding-right: max(16px, env(safe-area-inset-right));
+    }
+    .cards { gap: 8px; }
+    .stat { padding: 12px 10px; }
   }
 
   @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
