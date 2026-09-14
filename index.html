@@ -151,10 +151,47 @@
   .bar .fill { display: block; height: 100%; border-radius: 5px; }
   .bar .n { text-align: right; color: var(--ink-faint); font-variant-numeric: tabular-nums; }
 
-  .cols { display: flex; align-items: flex-end; gap: 3px; height: 92px; }
+  .cols {
+    position: relative;
+    display: flex; align-items: flex-end; gap: 3px; height: 92px;
+    user-select: none; -webkit-user-select: none;
+  }
+  .cols:focus { outline: none; }
+  .cols:focus-visible { outline: 2px solid var(--celadon-deep); outline-offset: 4px; border-radius: 4px; }
   .col { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; height: 100%; }
-  .col .v { background: var(--celadon); border-radius: 3px 3px 0 0; min-height: 2px; }
+  .col .v {
+    display: flex; flex-direction: column-reverse;
+    background: var(--celadon); border-radius: 3px 3px 0 0;
+    min-height: 2px; overflow: hidden;
+    transition: opacity 140ms ease;
+  }
   .col.zero .v { background: var(--line); }
+  .col .seg { display: block; width: 100%; }
+  .cols.dim .col:not(.act) .v { opacity: 0.32; }
+
+  .tip {
+    position: absolute; left: 0; bottom: 0; z-index: 5;
+    min-width: 106px; max-width: 100%;
+    background: var(--card);
+    border: 1px solid var(--line); border-radius: 9px;
+    box-shadow: 0 8px 20px rgba(35, 43, 41, 0.12);
+    padding: 8px 11px 7px;
+    font-size: 12px; line-height: 1.5;
+    pointer-events: none;
+    opacity: 0; transform: translateY(3px);
+    transition: opacity 130ms ease, transform 130ms ease;
+  }
+  .tip.on { opacity: 1; transform: none; }
+  .tip-head {
+    display: flex; justify-content: space-between; gap: 14px;
+    padding-bottom: 5px; margin-bottom: 5px;
+    border-bottom: 1px solid var(--line);
+    color: var(--ink-soft); white-space: nowrap;
+  }
+  .tip-head b { color: var(--ink); font-weight: 500; font-variant-numeric: tabular-nums; }
+  .tip-row { display: flex; align-items: center; gap: 7px; padding: 1px 0; white-space: nowrap; }
+  .tip-row .n { margin-left: auto; padding-left: 10px; color: var(--ink-faint); font-variant-numeric: tabular-nums; }
+  .tip-none { color: var(--ink-faint); white-space: nowrap; }
   .axis {
     display: flex; justify-content: space-between;
     margin-top: 7px; font-size: 11px; color: var(--ink-faint);
@@ -271,9 +308,11 @@
 
   let log = [];
 
-  function today() {
-    const d = new Date();
+  function ymd(d) {
     return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+  }
+  function today() {
+    return ymd(new Date());
   }
   function prettyDate() {
     const d = new Date();
@@ -353,15 +392,127 @@
       '<span class="n">' + n + '</span></div>';
   }
 
-  function columns(el, values, labelFor) {
-    const max = Math.max.apply(null, values.concat([1]));
-    el.innerHTML = values.map(function (v, i) {
-      const h = Math.round((v / max) * 100);
-      const title = labelFor ? ' title="' + labelFor(i) + ': ' + v + '回"' : '';
-      return '<span class="col' + (v ? '' : ' zero') + '"' + title +
-        '><span class="v" style="height:' + (v ? Math.max(h, 4) : 2) + '%"></span></span>';
-    }).join("");
+  // 各バケツに {total, counts:{drinkId:n}} を貯める。indexOf が範囲外を返した記録は捨てる。
+  function bucketsFrom(n, indexOf) {
+    const out = [];
+    for (let i = 0; i < n; i++) out.push({ total: 0, counts: {} });
+    log.forEach(function (e) {
+      const i = indexOf(e);
+      if (i == null || i < 0 || i >= n) return;
+      out[i].total += 1;
+      out[i].counts[e.id] = (out[i].counts[e.id] || 0) + 1;
+    });
+    return out;
   }
+
+  function columns(el, buckets, labelFor) {
+    const totals = buckets.map(function (b) { return b.total; });
+    const max = Math.max.apply(null, totals.concat([1]));
+    el.innerHTML = buckets.map(function (b, i) {
+      const h = b.total ? Math.max(Math.round((b.total / max) * 100), 5) : 2;
+      const segs = DRINKS.map(function (d) {
+        const n = b.counts[d.id] || 0;
+        return n ? '<span class="seg" style="flex:' + n + ';background:' + d.color + '"></span>' : "";
+      }).join("");
+      return '<span class="col' + (b.total ? "" : " zero") + '" data-i="' + i + '">' +
+        '<span class="v" style="height:' + h + '%">' + segs + '</span></span>';
+    }).join("");
+
+    el._buckets = buckets;
+    el._labelFor = labelFor;
+    const tip = document.createElement("div");
+    tip.className = "tip";
+    el.appendChild(tip);
+    wireTips(el);
+  }
+
+  function tipHtml(el, i) {
+    const b = el._buckets[i];
+    const rows = DRINKS.map(function (d) {
+      const n = b.counts[d.id] || 0;
+      if (!n) return "";
+      return '<div class="tip-row"><span class="dot" style="background:' + d.color + '"></span>' +
+        d.name + '<span class="n">' + n + '</span></div>';
+    }).join("");
+    return '<div class="tip-head">' + el._labelFor(i) + ' <b>' + b.total + '回</b></div>' +
+      (rows || '<div class="tip-none">記録なし</div>');
+  }
+
+  function showTip(el, i) {
+    const cols = el.querySelectorAll(".col");
+    const col = cols[i];
+    const tip = el.querySelector(".tip");
+    if (!col || !tip) return;
+    el._i = i;
+
+    // グラフは複数あるので、他のグラフのツールチップは閉じておく。
+    document.querySelectorAll(".cols").forEach(function (o) { if (o !== el) hideTip(o); });
+
+    tip.innerHTML = tipHtml(el, i);
+    tip.classList.add("on");
+    el.classList.add("dim");
+    cols.forEach(function (c) { c.classList.toggle("act", c === col); });
+
+    const wrap = el.getBoundingClientRect();
+    const rect = col.getBoundingClientRect();
+    const bar = col.querySelector(".v").getBoundingClientRect();
+    const left = rect.left - wrap.left + rect.width / 2 - tip.offsetWidth / 2;
+    tip.style.left = Math.max(0, Math.min(left, wrap.width - tip.offsetWidth)) + "px";
+    tip.style.bottom = (wrap.bottom - bar.top + 8) + "px";
+  }
+
+  function hideTip(el) {
+    const tip = el.querySelector(".tip");
+    if (tip) tip.classList.remove("on");
+    el.classList.remove("dim");
+    el.querySelectorAll(".col.act").forEach(function (c) { c.classList.remove("act"); });
+  }
+
+  // リスナーはコンテナに一度だけ張る。中身は再描画で作り直されるため委譲で拾う。
+  function wireTips(el) {
+    if (el._wired) return;
+    el._wired = true;
+    el.setAttribute("tabindex", "0");
+
+    function colIndex(ev) {
+      const col = ev.target.closest ? ev.target.closest(".col") : null;
+      return col ? +col.dataset.i : -1;
+    }
+
+    el.addEventListener("pointerover", function (ev) {
+      if (ev.pointerType === "touch") return;
+      const i = colIndex(ev);
+      if (i >= 0) showTip(el, i);
+    });
+    el.addEventListener("pointerleave", function (ev) {
+      if (ev.pointerType !== "touch") hideTip(el);
+    });
+    el.addEventListener("click", function (ev) {
+      const i = colIndex(ev);
+      if (i >= 0) { showTip(el, i); ev.stopPropagation(); }
+    });
+    el.addEventListener("focus", function () {
+      showTip(el, el._i == null ? 0 : el._i);
+    });
+    el.addEventListener("blur", function () { hideTip(el); });
+    el.addEventListener("keydown", function (ev) {
+      const last = el.querySelectorAll(".col").length - 1;
+      if (last < 0) return;
+      let i = el._i == null ? 0 : el._i;
+      if (ev.key === "ArrowRight") i = Math.min(last, i + 1);
+      else if (ev.key === "ArrowLeft") i = Math.max(0, i - 1);
+      else if (ev.key === "Home") i = 0;
+      else if (ev.key === "End") i = last;
+      else if (ev.key === "Escape") { hideTip(el); el.blur(); return; }
+      else return;
+      ev.preventDefault();
+      showTip(el, i);
+    });
+  }
+
+  document.addEventListener("click", function () {
+    document.querySelectorAll(".cols").forEach(hideTip);
+  });
 
   function renderToday() {
     const t = todays();
@@ -425,10 +576,7 @@
       return barRow(d.name, typeCounts[i], tMax, d.color);
     }).join("");
 
-    const hours = [];
-    for (let h = 7; h <= 21; h++) {
-      hours.push(log.filter(function (e) { return e.h === h; }).length);
-    }
+    const hours = bucketsFrom(15, function (e) { return e.h - 7; });
     columns(document.getElementById("byHour"), hours, function (i) { return (i + 7) + "時"; });
 
     const dow = [0, 0, 0, 0, 0, 0, 0];
@@ -442,17 +590,20 @@
       return barRow(DOW[i] + "曜", dow[i], dMax, "var(--celadon-deep)");
     }).join("");
 
-    const recent = [], labels = [];
+    const dayIndex = {}, axisLabels = [], dayLabels = [];
     for (let i = 13; i >= 0; i--) {
       const d = new Date();
       d.setDate(d.getDate() - i);
-      const k = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
-      recent.push(days[k] || 0);
-      labels.push((d.getMonth() + 1) + "/" + d.getDate());
+      dayIndex[ymd(d)] = 13 - i;
+      axisLabels.push((d.getMonth() + 1) + "/" + d.getDate());
+      dayLabels.push((d.getMonth() + 1) + "/" + d.getDate() + " (" + DOW[d.getDay()] + ")");
     }
-    columns(document.getElementById("byDay"), recent, function (i) { return labels[i]; });
+    const recent = bucketsFrom(14, function (e) { return dayIndex[e.d]; });
+    columns(document.getElementById("byDay"), recent, function (i) {
+      return i === 13 ? "今日" : dayLabels[i];
+    });
     document.getElementById("dayAxis").innerHTML =
-      '<span>' + labels[0] + '</span><span>' + labels[7] + '</span><span>今日</span>';
+      '<span>' + axisLabels[0] + '</span><span>' + axisLabels[7] + '</span><span>今日</span>';
   }
 
   function render() { renderToday(); renderStats(); }
